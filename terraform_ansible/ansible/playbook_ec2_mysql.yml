@@ -1,0 +1,56 @@
+---
+- name: Create Ec2 instances
+  hosts: localhost
+  connection: local
+  vars_files:
+    - vars.yml
+    - secrets.yml
+  tasks: 
+  
+    - name: Create security group 
+      ec2_group: 
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        name: "{{ item.name }}"
+        description: Security group for ec2
+        state: present 
+        rules: "{{ item.rules }}"
+        region: "{{ aws_region }}"
+      with_items: "{{ security_groups }}"
+    - name: Launch ec2 instance
+      ec2_instance:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"  
+        key_name: "{{ item.ssh_key | default('mysql_key') }}"
+        tags: 
+          Name: "{{ item.name | default('') }}"
+          inventory_group: "{{ item.group | default('') }}"
+          inventory_host: "{{ item.name | default('') }}"
+        name: "{{ item.name }}"
+        security_group: "{{ item.security_group | default('') }}"
+        instance_type: "{{ item.type | default('t2.micro')}}"
+        image_id: "{{ aws_ec2_ami }}"
+        region: "{{ aws_region }}" 
+        wait: yes 
+        state: started 
+        wait_timeout: 600
+        count: 1 
+        network: 
+          assign_public_ip: true
+          vpc_subnet_id: "{{ aws_subnet }}"
+      register: ec2_registered
+      with_items: "{{ instances }}"
+    - name: Add host to inventory 
+      add_host: 
+        name: "{{ item.instances[0].public_ip_address }}"
+        groups: db 
+      with_items: "{{ ec2_registered.results }}"
+    
+- name: Install mysql 
+  hosts: db 
+  become: true
+  vars_files: 
+      - vars.yml
+  roles: 
+    - { role: geerlingguy.mysql }
+
