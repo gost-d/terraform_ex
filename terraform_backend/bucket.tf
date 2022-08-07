@@ -1,7 +1,5 @@
 provider "aws" { 
     region = "us-east-1"
-    access_key = "AKIA5S4TWFG2F3GGQPJI"
-    secret_key = "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"
 }
 
 resource "aws_kms_key" "terraform-bucket-key" {
